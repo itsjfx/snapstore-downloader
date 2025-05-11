@@ -3,30 +3,33 @@
 # usage: ./snapstore-dl PACKAGE [OPTIONS]
 # OPTIONS:
 # `--channel`, `-c`: set a channel, default is `stable`
-# `--output`, `-o`: set an output directory, default is `pwd`
+# `--output`, `-o`: set an output directory, default is `$PWD/PACKAGE-VERSION`
 #
 # see also: <https://api.snapcraft.io/docs/info.html>
 
 set -eu -o pipefail
 
-APP="$1"
+package="$1"
 shift
 channel=stable
-output="$(pwd)"
+output=
 while (( $# )); do
-    case "$1" in 
+    case "$1" in
         --channel|-c) channel="$2"; shift 2 ;;
         --output|--dest|-d|-o) output="$2"; shift 2 ;;
     esac
 done
 
 export channel
-echo "Fetching latest $channel Snap Store version for $APP" >&2
+echo "Fetching latest $channel Snap Store version for $package" >&2
 # https://api.snapcraft.io/docs/info.html
-data="$(curl -sS -H 'Snap-Device-Series: 16' https://api.snapcraft.io/v2/snaps/info/spotify \
+data="$(curl -sS -H 'Snap-Device-Series: 16' https://api.snapcraft.io/v2/snaps/info/"$package" \
     | jq -er '."channel-map"[] | select(.channel.name==env.channel) | [.download."sha3-384", .download.url, .version] | @tsv')"
 read sha_hash url version <<<"$data"
 echo "Got version $version" >&2
+if [[ -z "$output" ]]; then
+    output="$package-$version"
+fi
 
 file_path="$(mktemp --suffix=.snap)"
 trap 'rm -f -- "$file_path"' EXIT
